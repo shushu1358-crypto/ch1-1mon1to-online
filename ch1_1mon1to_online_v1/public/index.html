@@ -31,9 +31,30 @@ small{color:#687386}.reviewList{display:grid;gap:8px;margin-top:12px}.reviewItem
 
 .onlineGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.onlineBox{background:#f7f9fc;border:1px solid #e1e7ef;border-radius:14px;padding:14px}.onlineBox h3{margin:0 0 10px;font-size:16px}.onlineList{display:grid;gap:7px;max-height:300px;overflow:auto}.onlineItem{padding:9px 10px;background:#fff;border:1px solid #e0e5ed;border-radius:10px;font-size:13px}.onlineMeta{font-size:11px;color:#687386;margin-top:3px}.statusDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#999;margin-right:5px}.statusDot.ok{background:#18864b}.statusDot.off{background:#b56a00}
 @media(max-width:700px){.onlineGrid{grid-template-columns:1fr}}
+
+/* Render cold-start overlay */
+#wakeOverlay{position:fixed;inset:0;z-index:99999;background:rgba(8,12,20,.96);display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;text-align:center;color:#fff}
+#wakeOverlay.hidden{display:none}
+#wakeOverlayCard{width:min(560px,92vw);padding:34px 28px;border:1px solid rgba(255,255,255,.16);border-radius:22px;background:rgba(22,29,43,.98);box-shadow:0 24px 80px rgba(0,0,0,.45)}
+#wakeSpinner{width:58px;height:58px;border:6px solid rgba(255,255,255,.18);border-top-color:#fff;border-radius:50%;margin:0 auto 22px;animation:wakeSpin .85s linear infinite}
+#wakeTitle{font-size:25px;font-weight:900;margin-bottom:10px}
+#wakeText{font-size:15px;line-height:1.7;color:#d7deea}
+#wakeSub{font-size:12px;color:#9ba8bb;margin-top:14px}
+#wakeOffline{margin-top:20px;padding:11px 18px;border:0;border-radius:10px;font-weight:800;cursor:pointer;display:none}
+#wakeOverlay.slow #wakeOffline{display:inline-block}
+@keyframes wakeSpin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
+<div id="wakeOverlay">
+  <div id="wakeOverlayCard">
+    <div id="wakeSpinner"></div>
+    <div id="wakeTitle">Renderを無理やり起こしてます…</div>
+    <div id="wakeText">サーバーがスリープしている場合があります。<br>オンライン機能が使えるまで接続を試しています。</div>
+    <div id="wakeSub">しばらくお待ちください…</div>
+    <button id="wakeOffline" type="button">オンライン接続を待たずに開始</button>
+  </div>
+</div>
 <header><h1>📚 中1 1問1答</h1><div class="sub">中学1年生・全教科対応 学習トレーナー</div></header>
 <main>
 <section class="panel" style="margin-bottom:18px">
@@ -165,8 +186,10 @@ function renderStats(){
  $("allRate").textContent=(store.answered?Math.round(store.correct/store.answered*100):0)+"%";
  $("reviewList").innerHTML=store.review.length?store.review.map((x,i)=>`<div class="reviewItem"><b>${x[0]}</b>：${x[2]}<br><small>答え：${x[3]}</small></div>`).join(""):"<small>まだありません。</small>";
 }
+const $=id=>document.getElementById(id);
 const ONLINE_API=location.origin;
 let ONLINE_PROBLEMS=[];
+let ONLINE_Q=[];
 let ONLINE_LOADED=false;
 let wakeTimer=null;
 async function onlineFetch(url,opts={}){
@@ -187,12 +210,23 @@ function updateOnlineStatus(text,ok=false){
  $("onlineDot").className='statusDot '+(ok?'ok':'off');
  $("onlineStatus").textContent=text;
 }
+function setWakeOverlay(show,slow=false){
+ const o=$("wakeOverlay");
+ if(!o)return;
+ o.classList.toggle("hidden",!show);
+ o.classList.toggle("slow",slow);
+}
 async function loadOnline(){
  clearTimeout(wakeTimer);
+ setWakeOverlay(true,false);
  updateOnlineStatus('Renderを無理やり起こしてます…');
- wakeTimer=setTimeout(()=>updateOnlineStatus('Renderを無理やり起こしてます…まだ起動中'),900);
+ wakeTimer=setTimeout(()=>{
+   updateOnlineStatus('Renderを無理やり起こしてます…まだ起動中');
+   setWakeOverlay(true,true);
+ },5000);
  try{
-   const [health,problems,leaders]=await Promise.all([onlineFetch('/api/health'),onlineFetch('/api/problems'),onlineFetch('/api/leaderboard')]);
+   const health=await onlineFetch('/api/health');
+   const [problems,leaders]=await Promise.all([onlineFetch('/api/problems'),onlineFetch('/api/leaderboard')]);
    clearTimeout(wakeTimer);
    updateOnlineStatus('オンライン（Google Drive連携）',true);
    ONLINE_PROBLEMS=problems||[];
@@ -201,12 +235,18 @@ async function loadOnline(){
    subjects=[...new Set(ONLINE_Q.map(x=>x[0]))];
    fillSubjects();
    renderLeaderboard(leaders||[]); renderWiki();
+   setWakeOverlay(false);
  }catch(e){
    clearTimeout(wakeTimer);
    updateOnlineStatus('オフライン');
    $("leaderboard").innerHTML='<small>Renderに接続できません。ローカル問題はそのまま使えます。</small>';
+   setWakeOverlay(true,true);
+   $("wakeTitle").textContent='Renderを起こせませんでした';
+   $("wakeText").innerHTML='オンライン接続に時間がかかっています。<br>下のボタンからオンライン接続を待たずに開始できます。';
+   $("wakeSub").textContent='あとで「更新」を押せば再接続できます。';
  }
 }
+
 function setupOnlineUI(){
  $("postSubject").innerHTML=subjects.map(s=>`<option>${esc(s)}</option>`).join('');
  $("openSubmitProblem").onclick=()=>$('submitProblemBox').classList.toggle('hidden');
@@ -387,6 +427,7 @@ document.querySelectorAll("#keypad button").forEach(b=>b.onclick=()=>{
 // 日本語IMEの変換中にinput.valueを書き換えると「あああ…」のような
 // 入力崩れが起きるため、回答欄は変換完了まで触らず、採点時だけ正規化します。
 
+$("wakeOffline").onclick=()=>setWakeOverlay(false);
 fillSubjects();renderStats();setupOnlineUI();loadOnline();
 </script>
 </body>
