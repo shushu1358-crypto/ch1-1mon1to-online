@@ -1,17 +1,20 @@
-# 中1 1問1答 Online
+# 中1 1問1答 Online v2 (Google Drive + GAS)
 
-Render等に置いて、複数人で同じ問題集を使えるようにした版です。
+RenderのNode/ExpressサーバーとGoogle Apps Scriptをつなぎ、問題・カテゴリ・ランキングをGoogle DriveのJSONで共有する版です。
 
-## できること
-- オンライン共有問題
-- ユーザーによる問題投稿
-- AIによる問題チェック（OPENAI_API_KEY設定時）
-- AIが曖昧問題を修正案に回す
-- 問題の承認・却下（ADMIN_TOKEN）
-- オンラインランキング
-- 既存の959問＋承認済みコミュニティ問題
+## 仕様
+- 959問のローカル問題を初期搭載
+- 起動後はGASのGoogle Drive側問題をオンライン問題集として優先
+- ユーザー投稿は確認なしで即採用
+- ランキングはGoogle Driveへ保存
+- カテゴリ取得・追加・名前変更・削除API対応
+- OpenAI APIなし
+- Render Postgresなし
 
-## Render
+## Render設定
+Root Directory:
+`ch1_1mon1to_online_v1`
+
 Build Command:
 `npm install`
 
@@ -19,13 +22,8 @@ Start Command:
 `npm start`
 
 Environment Variables:
-- `DATABASE_URL`（PostgreSQL推奨）
-- `OPENAI_API_KEY`（AI審査を使う場合）
-- `OPENAI_MODEL=gpt-5.6-luna`
-- `ADMIN_TOKEN`（管理用）
+- `GAS_URL` = Google Apps ScriptのWebアプリURL
+- `ADMIN_TOKEN` = Render側の管理API用秘密文字列
+- `GAS_ADMIN_TOKEN` = GAS Code.gsのADMIN_TOKENと同じ文字列
 
-DATABASE_URLがない場合はdata/store.jsonに保存する簡易モードになります。ただしRenderの通常ディスクは永続保存用途には向かないので、本番ではPostgreSQLを使ってください。
-
-## 管理API
-`GET /api/admin/problems` + `x-admin-token`
-`POST /api/admin/problems/:id/status` body: `{ "status": "approved" | "rejected" | "pending" }`
+RenderのFree Web Serviceは15分間インバウンド通信がないとスピンダウンし、次のHTTPリクエストで再起動します。再起動には時間がかかることがあります。アプリ側では接続確認中に「Renderを無理やり起こしてます…」と表示します。
