@@ -15,7 +15,7 @@ select,input[type=text]{width:100%;padding:11px 12px;border:1px solid #cfd7e3;bo
 button{border:0;border-radius:11px;padding:11px 15px;cursor:pointer;background:#172033;color:white;font-weight:700}
 button.secondary{background:#edf1f6;color:#172033}button.good{background:#18864b}button.warn{background:#b56a00}
 .stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}.stat{background:#f7f9fc;border:1px solid #e4e9f0;border-radius:12px;padding:9px 13px;font-size:13px}
-.question{font-size:25px;font-weight:750;line-height:1.6;margin:25px 0}.answerRow{display:flex;gap:10px;align-items:flex-start}.answerFields{flex:1;display:flex;flex-direction:column;gap:8px}.answerFields input{width:100%;box-sizing:border-box}.answerRow>button{flex:none}.multiHint{font-size:12px;color:#687386;margin-top:2px}
+.question{font-size:25px;font-weight:750;line-height:1.6;margin:25px 0}.answerRow{display:flex;gap:10px;align-items:flex-start}.answerRow.hidden{display:none!important}.answerFields{flex:1;display:flex;flex-direction:column;gap:8px}.answerFields input{width:100%;box-sizing:border-box}.answerRow>button{flex:none}.multiHint{font-size:12px;color:#687386;margin-top:2px}
 .feedback{margin-top:16px;padding:15px;border-radius:12px;background:#f5f7fa;display:none}.feedback.show{display:block}.correct{background:#e8f7ee}.incorrect{background:#fff0f0}
 .options{display:grid;grid-template-columns:1fr 1fr;gap:10px}.options button{background:#fff;color:#172033;border:1px solid #cfd7e3;text-align:left}.options button:hover{background:#f2f5f9}
 .hidden{display:none!important}.progress{height:8px;background:#e9edf3;border-radius:99px;overflow:hidden}.bar{height:100%;width:0;background:#172033;transition:.25s}
@@ -276,11 +276,22 @@ function fillSubjects(){
  updateUnits();
 }
 function updateUnits(){
- let s=$("subject").value;
- let units=[...new Set(Q.filter(x=>s==="ALL"||x[0]===s).map(x=>x[1]))];
- $("unitChoices").innerHTML='<label class="allUnit"><input type="checkbox" value="ALL" checked> 全単元</label>'+units.map(u=>`<label><input type="checkbox" value="${u}"> ${u}</label>`).join("");
- const boxes=[...document.querySelectorAll('#unitChoices input')];
- boxes.forEach(b=>b.onchange=()=>{ if(b.value==='ALL'&&b.checked) boxes.filter(x=>x.value!=='ALL').forEach(x=>x.checked=false); if(b.value!=='ALL'&&b.checked) boxes.find(x=>x.value==='ALL').checked=false; if(!boxes.some(x=>x.value!=='ALL'&&x.checked)) boxes.find(x=>x.value==='ALL').checked=true; });
+ const s=$("subject").value;
+ const base=(ONLINE_LOADED&&ONLINE_Q.length)?ONLINE_Q:QUNIQUE;
+ const units=[...new Set(base.filter(x=>s==="ALL"||x[0]===s).map(x=>x[1]).filter(Boolean))];
+ $("unitChoices").innerHTML='<label class="allUnit"><input type="checkbox" value="ALL" checked> 全単元</label>'+units.map(u=>`<label><input type="checkbox" value="${esc(u)}"> ${esc(u)}</label>`).join("");
+ const boxes=[...document.querySelectorAll('#unitChoices input[type=checkbox]')];
+ const allBox=()=>boxes.find(x=>x.value==="ALL");
+ const unitBoxes=()=>boxes.filter(x=>x.value!=="ALL");
+ boxes.forEach(b=>b.onchange=()=>{
+   const all=allBox();
+   if(b.value==="ALL" && b.checked){
+     unitBoxes().forEach(x=>x.checked=false);
+   }else if(b.value!=="ALL" && b.checked){
+     if(all) all.checked=false;
+   }
+   if(!unitBoxes().some(x=>x.checked) && all) all.checked=true;
+ });
 }
 $("subject").onchange=updateUnits;
 
@@ -288,17 +299,28 @@ function uniqueKey(q){
  const a=Array.isArray(q)?q:[];
  return [a[0],a[1],a[2]].map(v=>String(v??"").normalize("NFKC").trim().toLowerCase().replace(/[ 　]/g,"")).join("\u241f");
 }
+function getSelectedUnits(){
+ const boxes=[...document.querySelectorAll('#unitChoices input[type=checkbox]')];
+ const all=boxes.find(x=>x.value==="ALL");
+ const selected=boxes.filter(x=>x.checked && x.value!=="ALL").map(x=>x.value);
+ // 全単元がON、または単元が1つも選ばれていない場合は単元で絞り込まない
+ return {allUnits:!!all?.checked || selected.length===0, selected};
+}
 function makeList(){
- let subj=$("subject").value;
- let selected=[...document.querySelectorAll('#unitChoices input:checked')].map(x=>x.value);
- let allUnits=selected.includes("ALL")||selected.length===0;
- let d=$("difficulty").value;
+ const subj=$("subject").value;
+ const {allUnits,selected}=getSelectedUnits();
+ const d=$("difficulty").value;
  let source=(ONLINE_LOADED&&ONLINE_Q.length)?ONLINE_Q.slice():QUNIQUE.slice();
- if(subj==="数学"||subj==="ALL")source=source.concat(dynamicPool.map(()=>dynamicMath()));
- let filtered=source.filter(x=>(subj==="ALL"||x[0]===subj)&&(allUnits||selected.includes(x[1]))&&(d==="ALL"||String(x[5])===d));
+ if(subj==="数学"||subj==="ALL") source=source.concat(dynamicPool.map(()=>dynamicMath()));
+ const filtered=source.filter(x=>{
+   const subjectOK=subj==="ALL"||x[0]===subj;
+   const unitOK=allUnits||selected.includes(x[1]);
+   const diffOK=d==="ALL"||String(x[5])===d;
+   return subjectOK&&unitOK&&diffOK;
+ });
  const seen=new Set(),unique=[];
  for(const q of filtered){const k=uniqueKey(q);if(!seen.has(k)){seen.add(k);unique.push(q)}}
- let n=Number($("count").value);
+ const n=Number($("count").value);
  return unique.sort(()=>Math.random()-.5).slice(0,n===999?unique.length:Math.min(n,unique.length));
 }
 function start(list=makeList()){
@@ -326,8 +348,10 @@ function setupInputForQuestion(){
  const isFormula=isMath && (/[a-zA-Zπ]/.test(ans) || /[+×÷*=()]/.test(ans));
  const hasUnit=isMath && /(度|円|cm²|cm|m|人|個|本|拍|点|ビット|%)/.test(ans);
  const isNumericMath=isMath && (isFormula || hasUnit || /^[0-9０-９−+\-×÷*/().π]+$/.test(ans));
- const input=$("answer"),pad=$("keypad"),choice=$("choiceArea"),fields=$("answerFields");
- choice.classList.toggle("hidden",!isChoice); fields.innerHTML="";
+ const input=$("answer"),pad=$("keypad"),choice=$("choiceArea"),fields=$("answerFields"),answerRow=document.querySelector(".answerRow");
+ choice.classList.toggle("hidden",!isChoice);
+ answerRow?.classList.toggle("hidden",isChoice);
+ fields.innerHTML="";
  const parts=splitMultiAnswer(ans,String(state.current?.[2]||""));
  const isMulti=!isChoice&&parts.length>=2;
  if(isMulti){
@@ -417,8 +441,14 @@ $("start").onclick=()=>{ $("inputArea").classList.remove("hidden");start() };
 $("submit").onclick=submit;
 $("answer").onkeydown=e=>{if(e.key==="Enter")submit()};
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.classList.contains("multiAnswer"))submit()});
-$("yesBtn").onclick=()=>{if(!state.answered){$("answer").value="はい";submit()}};
-$("noBtn").onclick=()=>{if(!state.answered){$("answer").value="いいえ";submit()}};
+function submitChoice(value){
+ if(state.answered)return;
+ const input=$("answer");
+ if(input) input.value=value;
+ submit();
+}
+$("yesBtn").onclick=()=>submitChoice("はい");
+$("noBtn").onclick=()=>submitChoice("いいえ");
 $("next").onclick=next;
 $("addReview").onclick=()=>{
  let q=state.current;
