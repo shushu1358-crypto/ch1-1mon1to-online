@@ -284,6 +284,10 @@ function updateUnits(){
 }
 $("subject").onchange=updateUnits;
 
+function uniqueKey(q){
+ const a=Array.isArray(q)?q:[];
+ return [a[0],a[1],a[2]].map(v=>String(v??"").normalize("NFKC").trim().toLowerCase().replace(/[ 　]/g,"")).join("\u241f");
+}
 function makeList(){
  let subj=$("subject").value;
  let selected=[...document.querySelectorAll('#unitChoices input:checked')].map(x=>x.value);
