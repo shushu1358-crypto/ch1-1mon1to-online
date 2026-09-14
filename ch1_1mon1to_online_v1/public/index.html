@@ -307,6 +307,18 @@ function start(list=makeList()){
 }
 
 
+function splitMultiAnswer(answer, question){
+ const raw=String(answer ?? '').trim();
+ if(!raw) return [''];
+ // 複数解答として扱う区切り。\n // 「5と-5」「細胞壁・葉緑体」「A、B」などに対応。
+ const parts=raw.split(/\s*(?:・|、|\s+と\s+|\s*\/\s*|\s*\/／\s*)\s*/).map(x=>x.trim()).filter(Boolean);
+ if(parts.length>=2) return parts;
+ // 「AとB」のような日本語の接続を、単語・短句として分割
+ const jpAnd=raw.split(/\s*と\s*/).map(x=>x.trim()).filter(Boolean);
+ if(jpAnd.length>=2 && !/^(?:\d+\s*と\s*-?\d+|\d+\s*と\s*\d+)$/.test(raw)) return jpAnd;
+ return [raw];
+}
+
 function setupInputForQuestion(){
  const isMath=state.current && state.current[0]==="数学";
  const isChoice=state.current && state.current[4]==="choice";
