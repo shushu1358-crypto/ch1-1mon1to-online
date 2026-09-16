@@ -319,18 +319,68 @@ function getSelectedUnits(){
  // 全単元がON、または単元が1つも選ばれていない場合は単元で絞り込まない
  return {allUnits:!!all?.checked || selected.length===0, selected};
 }
+// 数学は「スタート」を押した時点で、選択された単元に合わせて新しい数値の問題を生成する。
+const dynamicPool=Array.from({length:40},()=>0);
+
+function randInt(min,max){return Math.floor(Math.random()*(max-min+1))+min}
+function pick(arr){return arr[randInt(0,arr.length-1)]}
+function dynamicMath(unitHint){
+ const unit=unitHint||pick(["正負の数","文字式","方程式","比例・反比例","図形","データ"]);
+ let q,a,d=2;
+ if(unit==="正負の数"){
+   const op=pick(["+","-","×","÷"]);
+   if(op==="÷"){const b=pick([-9,-8,-7,-6,-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9]); const k=randInt(-9,9)||1; const a1=b*k; q=`(${a1})÷(${b}) は？`; a=String(k);}
+   else{const x=randInt(-12,12),y=randInt(-12,12); const av=op==="+"?x+y:op==="-"?x-y:x*y; q=`(${x})${op}(${y}) は？`; a=String(av)}
+   d=1;
+ }else if(unit==="文字式"){
+   const c1=randInt(2,9),c2=randInt(2,9),v=randInt(2,9);
+   if(Math.random()<.5){q=`${c1}x+${c2}x は？`;a=`${c1+c2}x`;}
+   else{q=`x=${v} のとき ${c1}x+${c2} は？`;a=String(c1*v+c2);}
+   d=2;
+ }else if(unit==="方程式"){
+   const x=randInt(-9,9),m=pick([2,3,4,5,6]),b=randInt(-9,9),rhs=m*x+b;
+   q=`${m}x${b>=0?"+"+b:b}=${rhs} の x は？`;a=String(x);d=2;
+ }else if(unit==="比例・反比例"){
+   if(Math.random()<.5){const k=randInt(2,9),x=randInt(2,9);q=`y=${k}x で x=${x} のとき y は？`;a=String(k*x);}
+   else{const k=randInt(2,9),x=randInt(2,9);q=`y=${k}/x で x=${x} のとき y は？`;a=String(k*x/x); a=String(k);}
+   d=2;
+ }else if(unit==="図形"){
+   const w=randInt(3,15),h=randInt(3,15);
+   if(Math.random()<.5){q=`底辺${w}cm、高さ${h}cmの三角形の面積は？`;a=`${w*h/2}cm²`;}
+   else{q=`たて${h}cm、横${w}cmの長方形の面積は？`;a=`${w*h}cm²`;}
+   d=2;
+ }else{
+   const nums=Array.from({length:5},()=>randInt(1,20));
+   const sum=nums.reduce((x,y)=>x+y,0);
+   q=`${nums.join("、")} の平均値は？`;a=String(sum/nums.length);d=2;
+ }
+ return ["数学",unit,q,a,"input",d];
+}
+
 function makeList(){
  const subj=$("subject").value;
  const {allUnits,selected}=getSelectedUnits();
  const d=$("difficulty").value;
- let source=(ONLINE_LOADED&&ONLINE_Q.length)?ONLINE_Q.slice():QUNIQUE.slice();
- if(subj==="数学"||subj==="ALL") source=source.concat(dynamicPool.map(()=>dynamicMath()));
- const filtered=source.filter(x=>{
+ const base=(ONLINE_LOADED&&ONLINE_Q.length)?ONLINE_Q.slice():QUNIQUE.slice();
+ const filtered=base.filter(x=>{
    const subjectOK=subj==="ALL"||x[0]===subj;
    const unitOK=allUnits||selected.includes(x[1]);
    const diffOK=d==="ALL"||String(x[5])===d;
    return subjectOK&&unitOK&&diffOK;
  });
+ // 数学が選択されている場合だけ、選択単元からランダム生成問題を追加する。
+ if(subj==="数学"||subj==="ALL"){
+   const mathUnits=allUnits
+     ? ["正負の数","文字式","方程式","比例・反比例","図形","データ"]
+     : selected.filter(u=>["正負の数","文字式","方程式","比例・反比例","図形","データ"].includes(u));
+   if(mathUnits.length){
+     const target=Math.max(12,Number($("count").value)||10);
+     for(let i=0;i<target;i++){
+       const dm=dynamicMath(pick(mathUnits));
+       if(d==="ALL"||String(dm[5])===d) filtered.push(dm);
+     }
+   }
+ }
  const seen=new Set(),unique=[];
  for(const q of filtered){const k=uniqueKey(q);if(!seen.has(k)){seen.add(k);unique.push(q)}}
  const n=Number($("count").value);
