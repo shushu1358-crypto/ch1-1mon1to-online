@@ -30,7 +30,7 @@ small{color:#687386}.reviewList{display:grid;gap:8px;margin-top:12px}.reviewItem
 .keypad button{padding:13px;background:#edf1f6;color:#172033;font-size:18px}
 .keypad button.wide{grid-column:span 2}.formula-key{display:none}
 @media(max-width:600px){.keypad{max-width:none}}
-.unitChoices{display:flex;flex-wrap:wrap;gap:6px;max-height:110px;overflow:auto;padding:7px;border:1px solid #d7deea;border-radius:10px;background:#fff}.unitChoices label{display:flex;align-items:center;gap:4px;background:#edf1f6;padding:6px 8px;border-radius:8px;font-size:13px}.unitChoices .allUnit{font-weight:700}
+.unitChoices{display:flex;flex-wrap:wrap;gap:6px;max-height:110px;overflow:auto;padding:7px;border:1px solid #d7deea;border-radius:10px;background:#fff}.unitChoices label{display:flex;align-items:center;gap:4px;background:#edf1f6;padding:6px 8px;border-radius:8px;font-size:13px}.unitChoices .allUnit{font-weight:700}.tagChoices{display:flex;flex-wrap:wrap;gap:6px;max-height:90px;overflow:auto;padding:7px;border:1px solid #d7deea;border-radius:10px;background:#fff}.tagChoices label{display:flex;align-items:center;gap:4px;background:#f1f3f7;padding:6px 8px;border-radius:8px;font-size:13px}.tagChoices .allTag{font-weight:700}
 
 .onlineGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.onlineBox{background:#f7f9fc;border:1px solid #e1e7ef;border-radius:14px;padding:14px}.onlineBox h3{margin:0 0 10px;font-size:16px}.onlineList{display:grid;gap:7px;max-height:300px;overflow:auto}.onlineItem{padding:9px 10px;background:#fff;border:1px solid #e0e5ed;border-radius:10px;font-size:13px}.onlineMeta{font-size:11px;color:#687386;margin-top:3px}.statusDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#999;margin-right:5px}.statusDot.ok{background:#18864b}.statusDot.off{background:#b56a00}
 @media(max-width:700px){.onlineGrid{grid-template-columns:1fr}}
@@ -87,6 +87,7 @@ small{color:#687386}.reviewList{display:grid;gap:8px;margin-top:12px}.reviewItem
     </div>
     <label>問題文</label><input id="postQuestion" type="text" maxlength="1000" placeholder="例：江戸時代の17世紀後半、上方の町人を中心に発達した文化を何という？">
     <label style="margin-top:10px">正解</label><input id="postAnswer" type="text" maxlength="500" placeholder="例：元禄文化">
+    <label style="margin-top:10px">タグ（カンマ区切り・任意）</label><input id="postTags" type="text" maxlength="300" placeholder="例：重要,暗記,テスト対策">
     <label style="margin-top:10px">投稿者名</label><input id="postAuthor" type="text" maxlength="24" placeholder="匿名">
     <div class="actions"><button class="good" id="submitProblem">投稿して即採用</button><button class="secondary" id="closeSubmitProblem">閉じる</button></div>
     <div id="submitResult" class="feedback"></div>
@@ -102,6 +103,7 @@ small{color:#687386}.reviewList{display:grid;gap:8px;margin-top:12px}.reviewItem
   <div class="controls">
     <div><label>教科</label><select id="subject"></select></div>
     <div><label>単元（複数選択可）</label><div id="unitChoices" class="unitChoices"></div></div>
+    <div><label>タグ（複数選択可）</label><div id="tagChoices" class="tagChoices"><small style="color:#8892a5">タグなし</small></div></div>
     <div><label>出題数</label><select id="count"><option>10</option><option>20</option><option>30</option><option>50</option><option value="999">できるだけ</option></select></div>
     <div><label>難易度</label><select id="difficulty"><option value="ALL">おまかせ</option><option value="1">★ 基礎</option><option value="2">★★ 標準</option><option value="3">★★★ 発展</option></select></div>
   </div>
@@ -203,6 +205,8 @@ const $=id=>document.getElementById(id);
 const ONLINE_API=location.origin;
 let ONLINE_PROBLEMS=[];
 let ONLINE_Q=[];
+let ONLINE_CATEGORIES={};
+let ONLINE_TAGS=[];
 let ONLINE_LOADED=false;
 let wakeTimer=null;
 async function onlineFetch(url,opts={}){
@@ -216,8 +220,8 @@ function renderLeaderboard(rows){
  el.innerHTML=rows.map((r,i)=>`<div class="onlineItem"><b>${i+1}位　${esc(r.name)}</b><br><span>${Number(r.score||0).toLocaleString()} pt　正解 ${r.correct||0}/${r.answered||0}</span></div>`).join('');
 }
 function renderWiki(){
- const q=($("wikiSearch")?.value||'').toLowerCase(); const rows=ONLINE_PROBLEMS.filter(x=>`${x.subject} ${x.unit} ${x.question} ${x.author||''}`.toLowerCase().includes(q));
- $("wikiList").innerHTML=rows.length?rows.map(x=>`<div class="onlineItem"><b>${esc(x.question)}</b><div class="onlineMeta">${esc(x.subject)} / ${esc(x.unit)}　答え：${esc(x.answer)}　投稿：${esc(x.author||'オンライン')}</div></div>`).join(''):'<small>該当する問題はありません。</small>';
+ const q=($("wikiSearch")?.value||'').toLowerCase(); const rows=ONLINE_PROBLEMS.filter(x=>`${x.subject} ${x.unit} ${x.question} ${x.author||''} ${(Array.isArray(x.tags)?x.tags:[]).join(" ")}`.toLowerCase().includes(q));
+ $("wikiList").innerHTML=rows.length?rows.map(x=>`<div class="onlineItem"><b>${esc(x.question)}</b><div class="onlineMeta">${esc(x.subject)} / ${esc(x.unit)}　答え：${esc(x.answer)}　投稿：${esc(x.author||'オンライン')}${Array.isArray(x.tags)&&x.tags.length?`　🏷️ ${esc(x.tags.join(" / "))}`:""}</div></div>`).join(''):'<small>該当する問題はありません。</small>';
 }
 function updateOnlineStatus(text,ok=false){
  $("onlineDot").className='statusDot '+(ok?'ok':'off');
@@ -239,15 +243,32 @@ async function loadOnline(){
  },5000);
  try{
    const health=await onlineFetch('/api/health');
-   const [problems,leaders]=await Promise.all([onlineFetch('/api/problems'),onlineFetch('/api/leaderboard')]);
+   // 問題・ランキング・カテゴリを独立取得。カテゴリ側だけ失敗しても問題データは捨てない。
+   const results=await Promise.allSettled([
+     onlineFetch('/api/problems'),
+     onlineFetch('/api/leaderboard'),
+     onlineFetch('/api/categories')
+   ]);
    clearTimeout(wakeTimer);
    updateOnlineStatus('オンライン（Google Drive連携）',true);
+   const problems=results[0].status==='fulfilled'?results[0].value:[];
+   const leaders=results[1].status==='fulfilled'?results[1].value:[];
+   const categories=results[2].status==='fulfilled'?results[2].value:{};
    ONLINE_PROBLEMS=Array.isArray(problems)?problems:[];
-   ONLINE_Q=ONLINE_PROBLEMS.map(x=>[x.subject,x.unit,x.question,x.answer,x.inputType||'input',Number(x.difficulty)||1]).filter(x=>x[0]&&x[1]&&x[2]&&x[3]);
+   ONLINE_Q=ONLINE_PROBLEMS.map(x=>[x.subject,x.unit,x.question,x.answer,x.inputType||'input',Number(x.difficulty)||1,Array.isArray(x.tags)?x.tags:[]]).filter(x=>x[0]&&x[1]&&x[2]&&x[3]);
+   // categories.jsonだけでなくquestions.jsonのsubject/unitも必ずカテゴリとして採用する。
+   ONLINE_CATEGORIES=(categories&&typeof categories==='object')?JSON.parse(JSON.stringify(categories)):{};
+   for(const x of ONLINE_Q){
+     const sub=String(x[0]||'').trim(), unit=String(x[1]||'').trim();
+     if(!sub||!unit)continue;
+     if(!Array.isArray(ONLINE_CATEGORIES[sub])) ONLINE_CATEGORIES[sub]=[];
+     if(!ONLINE_CATEGORIES[sub].includes(unit)) ONLINE_CATEGORIES[sub].push(unit);
+   }
+   ONLINE_TAGS=[...new Set(ONLINE_PROBLEMS.flatMap(x=>Array.isArray(x.tags)?x.tags:[]).map(x=>String(x).trim()).filter(Boolean))];
    ONLINE_LOADED=true;
    // オンライン側が空でも、内蔵の全教科・全単元を消さない。
    // オンライン問題がある場合も内蔵問題と統合して選択肢を作る。
-   subjects=[...new Set(QUNIQUE.map(x=>x[0]).concat(ONLINE_Q.map(x=>x[0])))];
+   subjects=[...new Set(QUNIQUE.map(x=>x[0]).concat(ONLINE_Q.map(x=>x[0])).concat(Object.keys(ONLINE_CATEGORIES)))];
    fillSubjects();
    renderLeaderboard(leaders||[]); renderWiki();
    setWakeOverlay(false);
@@ -272,7 +293,7 @@ function setupOnlineUI(){
  $("submitProblem").onclick=async()=>{
    const result=$("submitResult"); result.className='feedback show'; result.textContent='問題をDriveに登録中…';
    try{
-     const body={subject:$('postSubject').value,unit:$('postUnit').value,question:$('postQuestion').value,answer:$('postAnswer').value,inputType:$('postType').value,difficulty:Number($('postDifficulty').value),author:$('postAuthor').value||$('onlineName').value||'匿名'};
+     const body={subject:$('postSubject').value,unit:$('postUnit').value.trim(),question:$('postQuestion').value,answer:$('postAnswer').value,inputType:$('postType').value,difficulty:Number($('postDifficulty').value),author:$('postAuthor').value||$('onlineName').value||'匿名',tags:$('postTags').value.split(',').map(x=>x.trim()).filter(Boolean)};
      const r=await onlineFetch('/api/problems',{method:'POST',body:JSON.stringify(body)});
      result.className='feedback show correct';
      result.textContent='✓ 問題を登録しました。確認なしで即採用されました。';
@@ -287,14 +308,45 @@ function sendOnlineScore(){
 }
 
 function fillSubjects(){
- $("subject").innerHTML='<option value="ALL">全教科</option>'+subjects.map(s=>`<option>${s}</option>`).join("");
- updateUnits();
+ $("subject").innerHTML='<option value="ALL">全教科</option>'+subjects.map(s=>`<option>${esc(s)}</option>`).join("");
+ const ps=$("postSubject"); if(ps) ps.innerHTML=subjects.map(s=>`<option>${esc(s)}</option>`).join("");
+ updateUnits(); updatePostUnitSuggestions(); updateTagChoices();
+}
+function categoryUnitsForSubject(s){
+ const out=[];
+ const fromCat=ONLINE_CATEGORIES && Array.isArray(ONLINE_CATEGORIES[s]) ? ONLINE_CATEGORIES[s] : [];
+ out.push(...fromCat);
+ const base=QUNIQUE.concat(ONLINE_Q);
+ out.push(...base.filter(x=>s==="ALL"||x[0]===s).map(x=>x[1]).filter(Boolean));
+ return [...new Set(out)];
+}
+function updatePostUnitSuggestions(){
+ const s=$("postSubject")?.value||subjects[0]||"";
+ const units=categoryUnitsForSubject(s);
+ let dl=$("postUnitList");
+ if(!dl){dl=document.createElement("datalist");dl.id="postUnitList";document.body.appendChild(dl);}
+ dl.innerHTML=units.map(u=>`<option value="${esc(u)}">`).join("");
+ const input=$("postUnit"); if(input) input.setAttribute("list","postUnitList");
+}
+function updateTagChoices(){
+ const el=$("tagChoices"); if(!el)return;
+ const tags=[...new Set(QUNIQUE.concat(ONLINE_Q).flatMap(x=>Array.isArray(x[6])?x[6]:[]).map(x=>String(x).trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
+ ONLINE_TAGS=tags;
+ el.innerHTML=tags.length?'<label class="allTag"><input type="checkbox" value="ALL" checked> 全タグ</label>'+tags.map(tag=>`<label><input type="checkbox" value="${esc(tag)}"> ${esc(tag)}</label>`).join(''):'<small style="color:#8892a5">タグなし</small>';
+ const boxes=[...el.querySelectorAll('input')]; const all=()=>boxes.find(x=>x.value==='ALL'); const rest=()=>boxes.filter(x=>x.value!=='ALL');
+ boxes.forEach(b=>b.onchange=()=>{if(b.value==='ALL'&&b.checked)rest().forEach(x=>x.checked=false);else if(b.value!=='ALL'&&b.checked){if(all())all().checked=false;}if(!rest().some(x=>x.checked)&&all())all().checked=true;});
+}
+function getSelectedTags(){
+ const boxes=[...document.querySelectorAll('#tagChoices input[type=checkbox]')];
+ const all=boxes.find(x=>x.value==='ALL');
+ const selected=boxes.filter(x=>x.checked&&x.value!=='ALL').map(x=>x.value);
+ return {allTags:!!all?.checked||selected.length===0,selected};
 }
 function updateUnits(){
  const s=$("subject").value;
  // 内蔵問題＋オンライン問題から実在する単元だけを作る。
  const base=QUNIQUE.concat(ONLINE_Q);
- const units=[...new Set(base.filter(x=>s==="ALL"||x[0]===s).map(x=>x[1]).filter(Boolean))];
+ const units=categoryUnitsForSubject(s);
  $("unitChoices").innerHTML='<label class="allUnit"><input type="checkbox" value="ALL" checked> 全単元</label>'+units.map(u=>`<label><input type="checkbox" value="${esc(u)}"> ${esc(u)}</label>`).join("");
  const boxes=[...document.querySelectorAll('#unitChoices input[type=checkbox]')];
  const allBox=()=>boxes.find(x=>x.value==="ALL");
@@ -309,7 +361,8 @@ function updateUnits(){
    if(!unitBoxes().some(x=>x.checked) && all) all.checked=true;
  });
 }
-$("subject").onchange=updateUnits;
+$("subject").onchange=()=>{updateUnits();updateTagChoices();};
+$("postSubject").onchange=updatePostUnitSuggestions;
 
 function uniqueKey(q){
  const a=Array.isArray(q)?q:[];
@@ -363,13 +416,16 @@ function dynamicMath(unitHint){
 function makeList(){
  const subj=$("subject").value;
  const {allUnits,selected}=getSelectedUnits();
+ const {allTags,selected:tagSelected}=getSelectedTags();
  const d=$("difficulty").value;
  const base=QUNIQUE.concat(ONLINE_Q);
  const filtered=base.filter(x=>{
    const subjectOK=subj==="ALL"||x[0]===subj;
    const unitOK=allUnits||selected.includes(x[1]);
    const diffOK=d==="ALL"||String(x[5])===d;
-   return subjectOK&&unitOK&&diffOK;
+   const tags=Array.isArray(x[6])?x[6]:[];
+   const tagOK=allTags||tagSelected.some(tag=>tags.includes(tag));
+   return subjectOK&&unitOK&&diffOK&&tagOK;
  });
  // 数学が選択されている場合だけ、選択単元からランダム生成問題を追加する。
  if(subj==="数学"||subj==="ALL"){
