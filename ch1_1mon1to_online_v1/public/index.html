@@ -219,9 +219,29 @@ function renderLeaderboard(rows){
  const el=$("leaderboard"); if(!rows.length){el.innerHTML='<small>まだランキングデータがありません。</small>';return}
  el.innerHTML=rows.map((r,i)=>`<div class="onlineItem"><b>${i+1}位　${esc(r.name)}</b><br><span>${Number(r.score||0).toLocaleString()} pt　正解 ${r.correct||0}/${r.answered||0}</span></div>`).join('');
 }
+function wikiRows(){
+ // Wikiは「オンライン投稿だけ」ではなく、内蔵問題＋Google Driveのquestions.jsonをまとめて対象にする。
+ const local=QUNIQUE.map(x=>({
+   subject:x[0],unit:x[1],question:x[2],answer:x[3],inputType:x[4]||'input',difficulty:Number(x[5])||1,
+   author:'内蔵問題',tags:Array.isArray(x[6])?x[6]:[]
+ }));
+ const online=Array.isArray(ONLINE_PROBLEMS)?ONLINE_PROBLEMS:[];
+ const all=local.concat(online);
+ const seen=new Set(),out=[];
+ for(const x of all){
+   const key=[x.subject,x.unit,x.question,x.answer].map(v=>String(v??'').normalize('NFKC').trim().toLowerCase().replace(/[ 　]/g,'')).join('\u241f');
+   if(seen.has(key))continue;
+   seen.add(key);out.push(x);
+ }
+ return out;
+}
 function renderWiki(){
- const q=($("wikiSearch")?.value||'').toLowerCase(); const rows=ONLINE_PROBLEMS.filter(x=>`${x.subject} ${x.unit} ${x.question} ${x.author||''} ${(Array.isArray(x.tags)?x.tags:[]).join(" ")}`.toLowerCase().includes(q));
- $("wikiList").innerHTML=rows.length?rows.map(x=>`<div class="onlineItem"><b>${esc(x.question)}</b><div class="onlineMeta">${esc(x.subject)} / ${esc(x.unit)}　答え：${esc(x.answer)}　投稿：${esc(x.author||'オンライン')}${Array.isArray(x.tags)&&x.tags.length?`　🏷️ ${esc(x.tags.join(" / "))}`:""}</div></div>`).join(''):'<small>該当する問題はありません。</small>';
+ const q=($('wikiSearch')?.value||'').toLowerCase().trim();
+ const rows=wikiRows().filter(x=>{
+   const tags=Array.isArray(x.tags)?x.tags:[];
+   return `${x.subject} ${x.unit} ${x.question} ${x.answer} ${x.author||''} ${tags.join(' ')}`.toLowerCase().includes(q);
+ });
+ $('wikiList').innerHTML=rows.length?rows.map(x=>`<div class="onlineItem"><b>${esc(x.question)}</b><div class="onlineMeta">${esc(x.subject)} / ${esc(x.unit)}　答え：${esc(x.answer)}　投稿：${esc(x.author||'オンライン')}${Array.isArray(x.tags)&&x.tags.length?`　🏷️ ${esc(x.tags.join(' / '))}`:''}</div></div>`).join(''):'<small>該当する問題はありません。</small>';
 }
 function updateOnlineStatus(text,ok=false){
  $("onlineDot").className='statusDot '+(ok?'ok':'off');
