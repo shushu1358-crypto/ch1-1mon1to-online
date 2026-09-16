@@ -135,7 +135,7 @@ small{color:#687386}.reviewList{display:grid;gap:8px;margin-top:12px}.reviewItem
       <button type="button" class="formula-key" data-key="a">a</button><button type="button" class="formula-key" data-key="b">b</button><button type="button" class="formula-key" data-key="c">c</button>
       <button type="button" class="formula-key" data-key="x">x</button><button type="button" class="formula-key" data-key="y">y</button><button type="button" class="formula-key" data-key="z">z</button>
       <button type="button" class="formula-key" data-key="r">r</button><button type="button" class="formula-key" data-key="s">s</button><button type="button" class="formula-key" data-key="t">t</button>
-      <button type="button" class="formula-key" data-key="pi">π</button><button type="button" class="formula-key" data-key=".">.</button>
+      <button type="button" class="formula-key" data-key="pi">π</button><button type="button" class="decimal-key" data-key=".">.</button>
       <button type="button" class="unit-key" data-key="度">度</button><button type="button" class="unit-key" data-key="円">円</button><button type="button" class="unit-key" data-key="cm">cm</button>
       <button type="button" class="unit-key" data-key="cm²">cm²</button><button type="button" class="unit-key" data-key="m">m</button><button type="button" class="unit-key" data-key="人">人</button>
       <button type="button" class="unit-key" data-key="個">個</button><button type="button" class="unit-key" data-key="本">本</button><button type="button" class="unit-key" data-key="拍">拍</button>
@@ -423,10 +423,11 @@ function setupInputForQuestion(){
    input.remove();
  }else{
    fields.appendChild(input);input.style.display="";input.readOnly=isNumericMath;input.inputMode=isNumericMath?"none":"text";
-   input.placeholder=isNumericMath?(isFormula?"式をテンキーで入力…":"数字・単位をテンキーで入力…"):"答えを入力…";input.value="";
+   input.placeholder=isNumericMath?(isFormula?"式をテンキーで入力…":"数字・小数・単位をテンキーで入力…"):"答えを入力…";input.value="";
  }
  pad.style.display=isNumericMath?"grid":"none";
  document.querySelectorAll(".formula-key").forEach(b=>b.style.display=isFormula?"block":"none");
+ document.querySelectorAll(".decimal-key").forEach(b=>b.style.display=isNumericMath?"block":"none");
  document.querySelectorAll(".unit-key").forEach(b=>{const k=b.dataset.key;b.style.display=(isNumericMath&&ans.includes(k))?"block":"none"});
 }
 function showQuestion(){
