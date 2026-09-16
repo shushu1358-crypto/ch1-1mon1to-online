@@ -242,10 +242,12 @@ async function loadOnline(){
    const [problems,leaders]=await Promise.all([onlineFetch('/api/problems'),onlineFetch('/api/leaderboard')]);
    clearTimeout(wakeTimer);
    updateOnlineStatus('オンライン（Google Drive連携）',true);
-   ONLINE_PROBLEMS=problems||[];
-   ONLINE_Q=ONLINE_PROBLEMS.map(x=>[x.subject,x.unit,x.question,x.answer,x.inputType||'input',Number(x.difficulty)||1]);
+   ONLINE_PROBLEMS=Array.isArray(problems)?problems:[];
+   ONLINE_Q=ONLINE_PROBLEMS.map(x=>[x.subject,x.unit,x.question,x.answer,x.inputType||'input',Number(x.difficulty)||1]).filter(x=>x[0]&&x[1]&&x[2]&&x[3]);
    ONLINE_LOADED=true;
-   subjects=[...new Set(ONLINE_Q.map(x=>x[0]))];
+   // オンライン側が空でも、内蔵の全教科・全単元を消さない。
+   // オンライン問題がある場合も内蔵問題と統合して選択肢を作る。
+   subjects=[...new Set(QUNIQUE.map(x=>x[0]).concat(ONLINE_Q.map(x=>x[0])))];
    fillSubjects();
    renderLeaderboard(leaders||[]); renderWiki();
    setWakeOverlay(false);
@@ -290,7 +292,8 @@ function fillSubjects(){
 }
 function updateUnits(){
  const s=$("subject").value;
- const base=(ONLINE_LOADED&&ONLINE_Q.length)?ONLINE_Q:QUNIQUE;
+ // 内蔵問題＋オンライン問題から実在する単元だけを作る。
+ const base=QUNIQUE.concat(ONLINE_Q);
  const units=[...new Set(base.filter(x=>s==="ALL"||x[0]===s).map(x=>x[1]).filter(Boolean))];
  $("unitChoices").innerHTML='<label class="allUnit"><input type="checkbox" value="ALL" checked> 全単元</label>'+units.map(u=>`<label><input type="checkbox" value="${esc(u)}"> ${esc(u)}</label>`).join("");
  const boxes=[...document.querySelectorAll('#unitChoices input[type=checkbox]')];
@@ -361,7 +364,7 @@ function makeList(){
  const subj=$("subject").value;
  const {allUnits,selected}=getSelectedUnits();
  const d=$("difficulty").value;
- const base=(ONLINE_LOADED&&ONLINE_Q.length)?ONLINE_Q.slice():QUNIQUE.slice();
+ const base=QUNIQUE.concat(ONLINE_Q);
  const filtered=base.filter(x=>{
    const subjectOK=subj==="ALL"||x[0]===subj;
    const unitOK=allUnits||selected.includes(x[1]);
